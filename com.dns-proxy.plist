@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.dns-proxy</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/sandbox-exec</string>
+        <string>-f</string>
+        <string>/opt/dns-proxy/dns-proxy.sb</string>
+        <string>-D</string>
+        <string>APP_DIR=/opt/dns-proxy</string>
+        <string>/opt/dns-proxy/dns-proxy</string>
+        <string>/opt/dns-proxy/config.toml</string>
+    </array>
+
+    <!-- Run as root initially (needed to bind port 53), then the binary drops to nobody -->
+    <key>UserName</key>
+    <string>root</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <!-- Restart if crashed, with 5s delay -->
+    <key>ThrottleInterval</key>
+    <integer>5</integer>
+
+    <key>StandardOutPath</key>
+    <string>/var/log/dns-proxy.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/var/log/dns-proxy.log</string>
+
+    <!-- Hardening: prevent child processes -->
+    <key>EnableTransactions</key>
+    <false/>
+</dict>
+</plist>

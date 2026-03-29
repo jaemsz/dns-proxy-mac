@@ -1,0 +1,39 @@
+[package]
+name = "dns-proxy"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "dns-proxy"
+path = "src/main.rs"
+
+[dependencies]
+# DNS wire-format parsing and upstream DoT resolution
+hickory-proto    = { version = "0.25", features = ["tls-ring", "webpki-roots"] }
+hickory-resolver = { version = "0.25", features = ["tls-ring", "webpki-roots"] }
+
+# Async runtime
+tokio = { version = "1", features = ["rt-multi-thread", "net", "signal", "macros"] }
+
+# TLS (ring crypto provider)
+tokio-rustls = { version = "0.26", features = ["ring"] }
+
+# Config
+serde = { version = "1", features = ["derive"] }
+toml  = "0.8"
+
+# Logging
+tracing            = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+
+# Privilege dropping (setuid/setgid)
+libc = "0.2"
+
+# Error handling
+anyhow = "1"
+
+[profile.release]
+opt-level     = 3
+lto           = "thin"
+codegen-units = 1
+strip         = "symbols"

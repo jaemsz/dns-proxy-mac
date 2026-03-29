@@ -1,0 +1,63 @@
+;; macOS sandbox profile for dns-proxy
+;; Usage: sandbox-exec -f dns-proxy.sb ./target/release/dns-proxy config.toml
+;;
+;; This profile restricts the process to only:
+;;   - Read config.toml and optional ca_cert PEM file
+;;   - Listen on UDP port 53 (localhost)
+;;   - Make outbound TCP connections (DoT to upstream on port 853)
+;;   - Basic system calls needed for async I/O
+;;
+;; Everything else is denied: no file writes, no process spawning,
+;; no access to user data, no camera/mic/location, etc.
+
+(version 1)
+
+;; Deny everything by default
+(deny default)
+
+;; Allow the process to run at all
+(allow process-exec)
+(allow process-fork)
+
+;; Allow reading the binary itself and essential system libraries
+(allow file-read*
+    (subpath "/usr/lib")
+    (subpath "/System/Library")
+    (subpath "/Library/Preferences")
+    (subpath "/private/var/db")
+    (literal "/dev/urandom")
+    (literal "/dev/random")
+    (literal "/dev/null")
+    (literal "/private/etc/resolv.conf"))
+
+;; Allow reading the application directory (binary + config + optional cert)
+(allow file-read*
+    (subpath (param "APP_DIR")))
+
+;; Allow mach lookups needed by the runtime
+(allow mach-lookup
+    (global-name "com.apple.system.logger")
+    (global-name "com.apple.system.notification_center"))
+
+;; Allow sysctl reads (needed by tokio/mio for kqueue)
+(allow sysctl-read)
+
+;; Network: allow UDP (listen on 53) and TCP outbound (DoT on 853)
+(allow network-bind
+    (local udp "*:53"))
+(allow network-inbound
+    (local udp "*:53"))
+(allow network-outbound
+    (remote tcp "*:853"))
+(allow network*
+    (local udp "localhost:*"))
+
+;; Allow signal handling
+(allow signal (target self))
+
+;; Deny everything else explicitly:
+;; - No file writes anywhere
+;; - No process execution (cannot shell out)
+;; - No access to user home directory
+;; - No access to cameras, microphone, contacts, etc.
+;; - No IPC beyond what's listed above

@@ -1,0 +1,14 @@
+[server]
+listen_udp    = "127.0.0.1:53"
+debug         = true
+# Drop to 'nobody' (uid/gid 65534) after binding port 53.
+# Find your uid with: id -u nobody
+drop_user_id  = 65534
+drop_group_id = 65534
+
+[upstream]
+addr       = "1.2.3.4:853"       # Replace with your EC2 dns-filter public IP
+tls_name   = "dns-filter"        # Must match the CN in the server's self-signed cert
+timeout_ms = 3000
+# Optional: path to custom CA cert (copy cert.pem from EC2 server)
+# ca_cert  = "cert.pem"
