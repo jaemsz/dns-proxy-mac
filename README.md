@@ -1,6 +1,6 @@
 # dns-proxy
 
-A lightweight DNS proxy for macOS that accepts standard DNS queries on UDP port 53 and forwards them encrypted over DNS-over-TLS (DoT, port 853) to a remote [dns](../dns/) server. All DNS traffic leaving your Mac is encrypted and filtered for malicious domains by the upstream server.
+A lightweight DNS proxy for macOS that accepts standard DNS queries on UDP port 53 and forwards them encrypted over DNS-over-TLS (DoT, port 853) to a remote [dns](https://github.com/jaemsz/dns/) server. All DNS traffic leaving your Mac is encrypted and filtered for malicious domains by the upstream server.
 
 ```
 macOS apps --> UDP :53 (localhost) --> dns-proxy --> DoT :853 --> dns-filter (AWS EC2)
