@@ -3,7 +3,7 @@
 A lightweight DNS proxy for macOS that accepts standard DNS queries on UDP port 53 and forwards them encrypted over DNS-over-TLS (DoT, port 853) to a remote [dns](https://github.com/jaemsz/dns/) server. All DNS traffic leaving your Mac is encrypted and filtered for malicious domains by the upstream server.
 
 ```
-macOS apps --> UDP :53 (localhost) --> dns-proxy --> DoT :853 --> dns-filter (AWS EC2)
+macOS apps --> UDP :53 (localhost) --> dns-proxy --> DoT :853 --> dns (AWS EC2)
 ```
 
 ## Security
@@ -22,7 +22,7 @@ The proxy is hardened against supply-chain attacks in its dependency tree:
 
 - macOS
 - Rust toolchain (`rustup`, `cargo`)
-- A running [dns-filter](../dns/) server with DoT enabled on port 853
+- A running [dns](https://github.com/jaemsz/dns/) server with DoT enabled on port 853
 
 ## Build
 
@@ -42,15 +42,15 @@ drop_user_id  = 65534    # 'nobody' user
 drop_group_id = 65534
 
 [upstream]
-addr       = "<EC2_PUBLIC_IP>:853"   # your dns-filter server IP
+addr       = "<EC2_PUBLIC_IP>:853"   # your dns server IP
 tls_name   = "dns-filter"           # must match CN in server's TLS cert
 timeout_ms = 3000
 # ca_cert  = "cert.pem"            # uncomment for self-signed server certs
 ```
 
-Replace `<EC2_PUBLIC_IP>` with your dns-filter server's public IP address. The `tls_name` must match the Common Name (CN) in the server's TLS certificate.
+Replace `<EC2_PUBLIC_IP>` with your dns server's public IP address. The `tls_name` must match the Common Name (CN) in the server's TLS certificate.
 
-If the dns-filter server uses a self-signed certificate, copy its `cert.pem` to the proxy directory and uncomment the `ca_cert` line.
+If the dns server uses a self-signed certificate, copy its `cert.pem` to the proxy directory and uncomment the `ca_cert` line.
 
 ## Install as a system service
 
@@ -98,7 +98,7 @@ networksetup -setdnsservers Wi-Fi empty
 # Should resolve normally
 dig @127.0.0.1 google.com
 
-# Should return NXDOMAIN (blocked by upstream dns-filter)
+# Should return NXDOMAIN (blocked by upstream dns)
 dig @127.0.0.1 ads.facebook.com
 ```
 
