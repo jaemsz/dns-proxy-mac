@@ -1,63 +1,72 @@
 ;; macOS sandbox profile for dns-proxy
-;; Usage: sandbox-exec -f dns-proxy.sb ./target/release/dns-proxy config.toml
+;; Usage: sandbox-exec -f dns-proxy.sb -D APP_DIR=/opt/dns-proxy /opt/dns-proxy/dns-proxy config.toml
 ;;
-;; This profile restricts the process to only:
-;;   - Read config.toml and optional ca_cert PEM file
-;;   - Listen on UDP port 53 (localhost)
-;;   - Make outbound TCP connections (DoT to upstream on port 853)
-;;   - Basic system calls needed for async I/O
-;;
-;; Everything else is denied: no file writes, no process spawning,
-;; no access to user data, no camera/mic/location, etc.
+;; Restricts the process to:
+;;   - Read-only access to system libraries and the app directory
+;;   - UDP listen on port 53, TCP outbound to port 853 only
+;;   - No file writes, no process spawning, no user data access
 
 (version 1)
 
 ;; Deny everything by default
 (deny default)
 
-;; Allow the process to run at all
+;; Allow the process to execute and fork (needed by tokio runtime)
 (allow process-exec)
 (allow process-fork)
 
-;; Allow reading the binary itself and essential system libraries
+;; ── File read access ─────────────────────────────────────────────────────────
+;; System libraries, frameworks, and dyld shared cache (required on Apple Silicon)
 (allow file-read*
     (subpath "/usr/lib")
-    (subpath "/System/Library")
+    (subpath "/System")
     (subpath "/Library/Preferences")
     (subpath "/private/var/db")
+    (subpath "/private/preboot")
+    (subpath "/System/Volumes/Preboot")
     (literal "/dev/urandom")
     (literal "/dev/random")
     (literal "/dev/null")
-    (literal "/private/etc/resolv.conf"))
+    (literal "/private/etc/resolv.conf")
+    (literal "/")
+    (literal "/private/var/run/resolv.conf"))
 
-;; Allow reading the application directory (binary + config + optional cert)
+;; Application directory (binary + config + optional CA cert)
 (allow file-read*
     (subpath (param "APP_DIR")))
 
-;; Allow mach lookups needed by the runtime
+;; ── IPC / Mach ───────────────────────────────────────────────────────────────
+;; Mach lookups needed by the runtime and system frameworks
 (allow mach-lookup
     (global-name "com.apple.system.logger")
-    (global-name "com.apple.system.notification_center"))
+    (global-name "com.apple.system.notification_center")
+    (global-name "com.apple.lsd.mapdb")
+    (global-name "com.apple.SecurityServer")
+    (global-name "com.apple.trustd")
+    (global-name "com.apple.cfprefsd.daemon")
+    (global-name "com.apple.cfprefsd.agent"))
 
-;; Allow sysctl reads (needed by tokio/mio for kqueue)
+;; ── Sysctl ───────────────────────────────────────────────────────────────────
+;; Needed by tokio/mio for kqueue and system info
 (allow sysctl-read)
 
-;; Network: allow UDP (listen on 53) and TCP outbound (DoT on 853)
-(allow network-bind
-    (local udp "*:53"))
-(allow network-inbound
-    (local udp "*:53"))
-(allow network-outbound
-    (remote tcp "*:853"))
-(allow network*
-    (local udp "localhost:*"))
+;; ── Network ──────────────────────────────────────────────────────────────────
+;; UDP: listen on port 53 for DNS queries
+(allow network-bind    (local udp "*:53"))
+(allow network-inbound (local udp "*:53"))
 
-;; Allow signal handling
+;; TCP: outbound to port 853 only (DoT to upstream)
+(allow network-outbound (remote tcp "*:853"))
+
+;; Allow local UDP traffic (responses)
+(allow network* (local udp "localhost:*"))
+
+;; ── Signals ──────────────────────────────────────────────────────────────────
 (allow signal (target self))
 
-;; Deny everything else explicitly:
+;; ── Everything else is denied ────────────────────────────────────────────────
 ;; - No file writes anywhere
-;; - No process execution (cannot shell out)
+;; - No process execution (cannot shell out or exec other binaries)
 ;; - No access to user home directory
-;; - No access to cameras, microphone, contacts, etc.
+;; - No access to cameras, microphone, contacts, location
 ;; - No IPC beyond what's listed above

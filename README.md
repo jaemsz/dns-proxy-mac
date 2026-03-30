@@ -11,11 +11,6 @@ macOS apps --> UDP :53 (localhost) --> dns-proxy --> DoT :853 --> dns (AWS EC2)
 The proxy is hardened against supply-chain attacks in its dependency tree:
 
 - **Privilege dropping** — Starts as root to bind port 53, then immediately drops to the `nobody` user (uid 65534). Compromised code runs without privileges.
-- **macOS sandbox** — A `sandbox-exec` profile restricts the process to:
-  - Read-only access to its own directory (config + binary)
-  - UDP listen on port 53 only
-  - TCP outbound to port 853 only (DoT)
-  - No file writes, no process spawning, no home directory access
 - **launchd service** — Auto-restarts on crash, logs to `/var/log/dns-proxy.log`
 
 ## Prerequisites
@@ -64,7 +59,6 @@ sudo mkdir -p /opt/dns-proxy
 # Copy files
 sudo cp target/release/dns-proxy /opt/dns-proxy/
 sudo cp config.toml /opt/dns-proxy/
-sudo cp dns-proxy.sb /opt/dns-proxy/
 
 # If using a custom CA cert for self-signed server certs:
 # sudo cp cert.pem /opt/dns-proxy/
@@ -105,10 +99,6 @@ dig @127.0.0.1 ads.facebook.com
 ## Run manually (without launchd)
 
 ```bash
-# With sandbox
-sudo sandbox-exec -f dns-proxy.sb -D APP_DIR=. ./target/release/dns-proxy config.toml
-
-# Without sandbox (development)
 sudo cargo run -- config.toml
 ```
 
