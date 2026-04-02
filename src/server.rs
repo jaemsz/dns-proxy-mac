@@ -1,6 +1,6 @@
 use crate::config::Config;
 use hickory_proto::op::{Message, MessageType, OpCode, ResponseCode};
-use hickory_proto::rr::RecordType;
+use hickory_proto::rr::{RData, RecordType};
 use hickory_proto::serialize::binary::{BinDecodable, BinEncodable};
 use hickory_proto::xfer::Protocol;
 use hickory_proto::ProtoErrorKind;
@@ -103,9 +103,16 @@ impl DnsProxy {
 
         // Forward to upstream dns-filter over DoT
         match self.forward(&query).await {
-            Ok(response) => response
-                .to_bytes()
-                .map_err(|e| anyhow::anyhow!("Encode response: {e}")),
+            Ok(response) => {
+                if self.config.server.debug {
+                    let resolved = extract_resolved_ip(&response);
+                    let rcode = response.response_code();
+                    info!(domain = %domain, qtype = ?qtype, resolved = %resolved, rcode = ?rcode, "Response");
+                }
+                response
+                    .to_bytes()
+                    .map_err(|e| anyhow::anyhow!("Encode response: {e}"))
+            }
             Err(e) => {
                 warn!(domain = %domain, error = %e, "Upstream DoT forwarding failed");
                 build_servfail(&query)
@@ -222,4 +229,16 @@ fn build_not_impl(query: &Message) -> anyhow::Result<Vec<u8>> {
     resp.set_response_code(ResponseCode::NotImp);
     resp.to_bytes()
         .map_err(|e| anyhow::anyhow!("Encode NOTIMP: {e}"))
+}
+
+/// Extract the first A or AAAA address from a DNS response message.
+fn extract_resolved_ip(msg: &Message) -> String {
+    for record in msg.answers() {
+        match record.data() {
+            RData::A(a) => return a.0.to_string(),
+            RData::AAAA(aaaa) => return aaaa.0.to_string(),
+            _ => {}
+        }
+    }
+    String::new()
 }

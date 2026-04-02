@@ -10,8 +10,45 @@ macOS apps --> UDP :53 (localhost) --> dns-proxy --> DoT :853 --> dns (AWS EC2)
 
 The proxy is hardened against supply-chain attacks in its dependency tree:
 
-- **Privilege dropping** — Starts as root to bind port 53, then immediately drops to the `nobody` user (uid 65534). Compromised code runs without privileges.
+- **Privilege dropping** — Starts as root to bind port 53, then immediately drops to an unprivileged user. Compromised code runs without privileges.
+- **Dedicated service user** — Runs as a locked-down `_dnsproxy` account instead of `nobody`, limiting file access to only what the service needs.
 - **launchd service** — Auto-restarts on crash, logs to `/var/log/dns-proxy.log`
+
+### Create a dedicated service user
+
+Using `nobody` (uid 65534) works but is overly broad — any file with world-readable permissions is accessible. A dedicated `_dnsproxy` user restricts the process to only the files you explicitly grant access to.
+
+```bash
+# Pick an unused UID/GID (check what's taken)
+dscl . -list /Users UniqueID | sort -n -k2 | tail -5
+dscl . -list /Groups PrimaryGroupID | sort -n -k2 | tail -5
+
+# Create the group (e.g., UID/GID 399)
+sudo dscl . -create /Groups/_dnsproxy
+sudo dscl . -create /Groups/_dnsproxy PrimaryGroupID 399
+
+# Create the user
+sudo dscl . -create /Users/_dnsproxy
+sudo dscl . -create /Users/_dnsproxy UniqueID 399
+sudo dscl . -create /Users/_dnsproxy PrimaryGroupID 399
+sudo dscl . -create /Users/_dnsproxy UserShell /usr/bin/false
+sudo dscl . -create /Users/_dnsproxy RealName "DNS Proxy Service"
+sudo dscl . -create /Users/_dnsproxy NFSHomeDirectory /opt/dns-proxy
+
+# Hide from login screen
+sudo dscl . -create /Users/_dnsproxy IsHidden 1
+```
+
+Then set file ownership so only `_dnsproxy` can read the config:
+
+```bash
+sudo chown root:_dnsproxy /opt/dns-proxy/config.toml
+sudo chmod 640 /opt/dns-proxy/config.toml
+
+# If using a custom CA cert:
+# sudo chown root:_dnsproxy /opt/dns-proxy/cert.pem
+# sudo chmod 640 /opt/dns-proxy/cert.pem
+```
 
 ## Prerequisites
 
@@ -33,8 +70,8 @@ Edit `config.toml`:
 [server]
 listen_udp    = "127.0.0.1:53"
 debug         = true
-drop_user_id  = 65534    # 'nobody' user
-drop_group_id = 65534
+drop_user_id  = 399      # '_dnsproxy' user (see Security section)
+drop_group_id = 399
 
 [upstream]
 addr       = "<EC2_PUBLIC_IP>:853"   # your dns server IP
