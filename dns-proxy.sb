@@ -2,38 +2,25 @@
 ;; Usage: sandbox-exec -f dns-proxy.sb -D APP_DIR=/opt/dns-proxy /opt/dns-proxy/dns-proxy config.toml
 ;;
 ;; Restricts the process to:
-;;   - Read-only access to system libraries and the app directory
+;;   - Read access to all files, write access denied
 ;;   - UDP listen on port 53, TCP outbound to port 853 only
-;;   - No file writes, no process spawning, no user data access
+;;   - No process spawning
 
 (version 1)
 
 ;; Deny everything by default
 (deny default)
 
-;; Allow the process to execute and fork (needed by tokio runtime)
-(allow process-exec)
+;; Only allow execution of binaries within /opt/dns-proxy
+(allow process-exec (subpath "/opt/dns-proxy"))
+(deny process-exec)
 (allow process-fork)
 
-;; ── File read access ─────────────────────────────────────────────────────────
-;; System libraries, frameworks, and dyld shared cache (required on Apple Silicon)
-(allow file-read*
-    (subpath "/usr/lib")
-    (subpath "/System")
-    (subpath "/Library/Preferences")
-    (subpath "/private/var/db")
-    (subpath "/private/preboot")
-    (subpath "/System/Volumes/Preboot")
-    (literal "/dev/urandom")
-    (literal "/dev/random")
-    (literal "/dev/null")
-    (literal "/private/etc/resolv.conf")
-    (literal "/")
-    (literal "/private/var/run/resolv.conf"))
-
-;; Application directory (binary + config + optional CA cert)
-(allow file-read*
-    (subpath (param "APP_DIR")))
+;; ── File access ──────────────────────────────────────────────────────────────
+;; Allow all reads, deny all writes, deny access to /Users
+(deny file-read* (subpath "/Users"))
+(allow file-read*)
+(deny file-write*)
 
 ;; ── IPC / Mach ───────────────────────────────────────────────────────────────
 ;; Mach lookups needed by the runtime and system frameworks
@@ -67,6 +54,5 @@
 ;; ── Everything else is denied ────────────────────────────────────────────────
 ;; - No file writes anywhere
 ;; - No process execution (cannot shell out or exec other binaries)
-;; - No access to user home directory
 ;; - No access to cameras, microphone, contacts, location
 ;; - No IPC beyond what's listed above

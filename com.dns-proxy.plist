@@ -7,6 +7,11 @@
 
     <key>ProgramArguments</key>
     <array>
+        <string>/usr/bin/sandbox-exec</string>
+        <string>-f</string>
+        <string>/opt/dns-proxy/dns-proxy.sb</string>
+        <string>-D</string>
+        <string>APP_DIR=/opt/dns-proxy</string>
         <string>/opt/dns-proxy/dns-proxy</string>
         <string>/opt/dns-proxy/config.toml</string>
     </array>
@@ -14,7 +19,8 @@
     <key>WorkingDirectory</key>
     <string>/opt/dns-proxy</string>
 
-    <!-- Run as root initially (needed to bind port 53), then the binary drops to nobody -->
+    <!-- Run as root initially (needed to bind port 53), then the binary drops privileges -->
+    <!-- sandbox-exec enforces the dns-proxy.sb profile -->
     <key>UserName</key>
     <string>root</string>
 
