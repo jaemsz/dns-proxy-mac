@@ -6,6 +6,16 @@ A lightweight DNS proxy for macOS that accepts standard DNS queries on UDP port 
 macOS apps --> UDP :53 (localhost) --> dns-proxy --> DoT :853 --> dns (AWS EC2)
 ```
 
+## Sandbox protections
+
+The process runs inside a macOS sandbox (`dns-proxy.sb`) enforced by `sandbox-exec`. Combined with privilege dropping, this limits the blast radius if the process or any dependency is compromised:
+
+- **File reads** — Allowed everywhere except `/Users` (no access to user home directories)
+- **File writes** — Denied entirely
+- **Process execution** — Only binaries in `/opt/dns-proxy` can be executed; no shell-outs
+- **Network** — UDP inbound on port 53 and TCP outbound to port 853 (DoT) only
+- **Privilege dropping** — Binds port 53 as root, then drops to a dedicated `_dnsproxy` user
+
 ## Prerequisites
 
 - macOS
@@ -52,6 +62,7 @@ sudo mkdir -p /opt/dns-proxy
 # Copy files
 sudo cp target/release/dns-proxy /opt/dns-proxy/
 sudo cp config.toml /opt/dns-proxy/
+sudo cp dns-proxy.sb /opt/dns-proxy/
 
 # If using a custom CA cert for self-signed server certs:
 # sudo cp cert.pem /opt/dns-proxy/
